@@ -2,6 +2,8 @@
 
 A lightweight desktop Markdown viewer built with C++ and wxWidgets. Renders Markdown files — including [Mermaid](https://mermaid.js.org) diagrams — entirely offline, with light and dark mode support.
 
+![MDViewer screenshot](screenshot.png)
+
 ## Features
 
 - **Markdown rendering** — headings, bold, italic, strikethrough, inline code, links, images, blockquotes, ordered/unordered lists, tables, horizontal rules, hard line breaks
