@@ -1,5 +1,8 @@
 #include "mdviewer.h"
-#include "mermaid_js.h"   // generated at build time: mermaid_js_data[], mermaid_js_data_len
+#include "mermaid_js.h"      // generated at build time: mermaid_js_data[], mermaid_js_data_len
+#include "hljs_js.h"         // generated at build time: hljs_js_data[], hljs_js_data_len
+#include "hljs_css_light.h"  // generated at build time: hljs_css_light_data[], hljs_css_light_data_len
+#include "hljs_css_dark.h"   // generated at build time: hljs_css_dark_data[], hljs_css_dark_data_len
 #include <wx/webview.h>
 #include <wx/filedlg.h>
 #include <wx/filename.h>
@@ -30,6 +33,35 @@ static const std::string& GetMermaidJS() {
     return cached;
 }
 
+static const std::string& GetHighlightJS() {
+    static std::string cached;
+    if (cached.empty()) {
+        cached.assign(reinterpret_cast<const char*>(hljs_js_data), hljs_js_data_len);
+        const std::string bad  = "</script>";
+        const std::string safe = "<\\/script>";
+        size_t pos = 0;
+        while ((pos = cached.find(bad, pos)) != std::string::npos) {
+            cached.replace(pos, bad.size(), safe);
+            pos += safe.size();
+        }
+    }
+    return cached;
+}
+
+static const std::string& GetHighlightCSSLight() {
+    static std::string cached;
+    if (cached.empty())
+        cached.assign(reinterpret_cast<const char*>(hljs_css_light_data), hljs_css_light_data_len);
+    return cached;
+}
+
+static const std::string& GetHighlightCSSDark() {
+    static std::string cached;
+    if (cached.empty())
+        cached.assign(reinterpret_cast<const char*>(hljs_css_dark_data), hljs_css_dark_data_len);
+    return cached;
+}
+
 // ---------------------------------------------------------------------------
 // Event table
 // ---------------------------------------------------------------------------
@@ -38,6 +70,8 @@ wxBEGIN_EVENT_TABLE(MDViewerFrame, wxFrame)
     EVT_MENU(ID_RELOAD,      MDViewerFrame::OnReload)
     EVT_MENU(ID_THEME_LIGHT, MDViewerFrame::OnThemeLight)
     EVT_MENU(ID_THEME_DARK,  MDViewerFrame::OnThemeDark)
+    EVT_MENU(ID_VIEW_LOGS,   MDViewerFrame::OnViewLogs)
+    EVT_MENU(ID_VIEW_DOC,    MDViewerFrame::OnViewDoc)
     EVT_MENU(wxID_EXIT,      MDViewerFrame::OnExit)
     EVT_CLOSE(               MDViewerFrame::OnClose)
 wxEND_EVENT_TABLE()
@@ -49,9 +83,13 @@ MDViewerFrame::MDViewerFrame(const wxString& filePath)
     : wxFrame(nullptr, wxID_ANY,
               "MDViewer — " + wxFileName(filePath).GetFullName(),
               wxDefaultPosition, wxSize(1280, 860))
-    , m_filePath(filePath)
     , m_darkMode(false)
 {
+    // Always store an absolute path so base URLs resolve correctly in WKWebView
+    wxFileName fn(filePath);
+    fn.MakeAbsolute();
+    m_filePath = fn.GetFullPath();
+
     // Load persisted theme preference (default: light)
     wxConfig cfg("MDViewer");
     m_darkMode = cfg.ReadBool("darkMode", false);
@@ -70,6 +108,9 @@ MDViewerFrame::MDViewerFrame(const wxString& filePath)
     view->AppendRadioItem(ID_THEME_LIGHT, "&Light Mode\tCtrl+Shift+L");
     view->AppendRadioItem(ID_THEME_DARK,  "&Dark Mode\tCtrl+Shift+D");
     view->Check(m_darkMode ? ID_THEME_DARK : ID_THEME_LIGHT, true);
+    view->AppendSeparator();
+    view->Append(ID_VIEW_LOGS, "View &Logs\tCtrl+Shift+G");
+    view->Append(ID_VIEW_DOC,  "View &Document\tCtrl+Shift+V");
     bar->Append(view, "&View");
 
     SetMenuBar(bar);
@@ -78,7 +119,8 @@ MDViewerFrame::MDViewerFrame(const wxString& filePath)
     SetStatusText("Loading…");
 
     m_webView = wxWebView::New(this, wxID_ANY, "about:blank");
-    LoadAndRender();
+    // Defer so WKWebView finishes initialising before we push content
+    CallAfter([this]() { LoadAndRender(); });
 }
 
 // ---------------------------------------------------------------------------
@@ -86,10 +128,15 @@ MDViewerFrame::MDViewerFrame(const wxString& filePath)
 // ---------------------------------------------------------------------------
 std::string MDViewerFrame::ReadFile(const std::string& path) {
     std::ifstream in(path, std::ios::binary);
-    if (!in) return "";
+    if (!in) {
+        Logger::get().log("ReadFile FAILED: " + path);
+        return "";
+    }
     std::ostringstream ss;
     ss << in.rdbuf();
-    return ss.str();
+    std::string content = ss.str();
+    Logger::get().log("ReadFile OK: " + path + "  (" + std::to_string(content.size()) + " bytes)");
+    return content;
 }
 
 // ---------------------------------------------------------------------------
@@ -97,29 +144,34 @@ std::string MDViewerFrame::ReadFile(const std::string& path) {
 // ---------------------------------------------------------------------------
 void MDViewerFrame::LoadAndRender() {
     wxString ext = wxFileName(m_filePath).GetExt().Lower();
+    Logger::get().log("LoadAndRender: " + m_filePath.ToStdString() + "  ext=" + ext.ToStdString());
 
     if (ext == "html" || ext == "htm") {
-        // Load the HTML file directly so relative resources (images, CSS) resolve
         wxString url = "file://" + m_filePath;
 #ifdef __WXMSW__
         url.Replace("/", "\\");
         url = "file:///" + m_filePath;
 #endif
+        Logger::get().log("LoadURL: " + url.ToStdString());
         m_webView->LoadURL(url);
         SetStatusText("Loaded HTML: " + m_filePath);
         return;
     }
 
-    // Treat everything else as Markdown
     std::string raw  = ReadFile(m_filePath.ToStdString());
     std::string body = RenderMarkdown(raw);
+    Logger::get().log("RenderMarkdown: input=" + std::to_string(raw.size())
+                      + " bytes  output=" + std::to_string(body.size()) + " bytes");
+
     std::string title = wxFileName(m_filePath).GetFullName().ToStdString();
     std::string html  = WrapWithTemplate(body, title, m_darkMode);
+    Logger::get().log("WrapWithTemplate: html=" + std::to_string(html.size()) + " bytes");
 
-    // Base URL lets relative images in the MD resolve to the file's directory
     wxString baseURL = "file://" + wxFileName(m_filePath).GetPath(wxPATH_GET_SEPARATOR);
+    Logger::get().log("SetPage baseURL: " + baseURL.ToStdString());
     m_webView->SetPage(wxString::FromUTF8(html), baseURL);
     SetStatusText("Rendered: " + m_filePath);
+    Logger::get().log("SetPage done");
 }
 
 // ---------------------------------------------------------------------------
@@ -614,6 +666,8 @@ std::string MDViewerFrame::WrapWithTemplate(const std::string& body,
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>)HTML" + EscapeHTML(title) + R"HTML(</title>
 <script>)HTML" + GetMermaidJS() + R"HTML(</script>
+<script>)HTML" + GetHighlightJS() + R"HTML(</script>
+<style>)HTML" + (darkMode ? GetHighlightCSSDark() : GetHighlightCSSLight()) + R"HTML(</style>
 <style>
 /* ── Theme tokens ───────────────────────────────────────────────────────── */
 :root {
@@ -679,6 +733,7 @@ pre{
   border-radius:6px;padding:16px;overflow-x:auto;margin-bottom:16px;
 }
 pre code{background:none;padding:0;font-size:87.5%;border:none}
+.hljs{background:transparent}
 
 /* ── Blockquote ─────────────────────────────────────────────────────────── */
 blockquote{
@@ -769,6 +824,9 @@ tr:nth-child(even) td{background:var(--surface)}
 </div>
 
 <script>
+// ── Highlight.js ─────────────────────────────────────────────────────────
+hljs.highlightAll();
+
 // ── Mermaid init (theme set by C++ based on current mode) ────────────────
 mermaid.initialize({startOnLoad:true, theme:')HTML" + mermaidTheme + R"HTML(', securityLevel:'loose'});
 
@@ -871,6 +929,73 @@ zmStage.addEventListener('touchend', () => { zmDrag = false; lastDist = 0; });
 // ---------------------------------------------------------------------------
 // Menu handlers
 // ---------------------------------------------------------------------------
+void MDViewerFrame::OnViewLogs(wxCommandEvent&) {
+    std::string logPath = std::string(getenv("HOME") ?: "") + "/Library/Logs/MDViewer/mdviewer.log";
+    std::string raw = ReadFile(logPath);
+
+    const std::string bg      = m_darkMode ? "#0d1117" : "#ffffff";
+    const std::string surface = m_darkMode ? "#161b22" : "#f6f8fa";
+    const std::string border  = m_darkMode ? "#30363d" : "#d0d7de";
+    const std::string text    = m_darkMode ? "#e6edf3" : "#24292f";
+    const std::string muted   = m_darkMode ? "#8b949e" : "#57606a";
+    const std::string green   = m_darkMode ? "#3fb950" : "#1a7f37";
+    const std::string red     = m_darkMode ? "#f85149" : "#cf222e";
+
+    std::string rows;
+    std::istringstream ss(raw);
+    std::string line;
+    while (std::getline(ss, line)) {
+        if (line.empty()) continue;
+        // Split "YYYY-MM-DD HH:MM:SS  <message>"
+        std::string ts, msg;
+        if (line.size() > 21 && line[10] == ' ' && line[19] == ' ') {
+            ts  = line.substr(0, 19);
+            msg = line.substr(21);  // skip two-space separator
+        } else {
+            msg = line;
+        }
+        // Colour coding: errors red, startup entries green
+        std::string msgColor = text;
+        if (msg.find("FAILED") != std::string::npos || msg.find("error") != std::string::npos)
+            msgColor = red;
+        else if (msg.find("=== startup") != std::string::npos)
+            msgColor = green;
+
+        rows += "<tr>"
+                "<td class='ts'>" + EscapeHTML(ts) + "</td>"
+                "<td style='color:" + msgColor + "'>" + EscapeHTML(msg) + "</td>"
+                "</tr>\n";
+    }
+
+    std::string html = R"HTML(<!DOCTYPE html><html><head>
+<meta charset="UTF-8">
+<title>MDViewer — Logs</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'SFMono-Regular',Consolas,monospace;font-size:13px;
+     background:)HTML" + bg + R"HTML(;color:)HTML" + text + R"HTML(;padding:24px}
+h2{font-size:15px;font-weight:600;margin-bottom:16px;color:)HTML" + text + R"HTML(}
+table{width:100%;border-collapse:collapse}
+tr{border-bottom:1px solid )HTML" + border + R"HTML(}
+tr:last-child{border-bottom:none}
+td{padding:5px 10px;vertical-align:top;white-space:pre-wrap;word-break:break-all}
+.ts{color:)HTML" + muted + R"HTML(;white-space:nowrap;padding-right:20px;user-select:none}
+tr:hover{background:)HTML" + surface + R"HTML(}
+</style></head><body>
+<h2>MDViewer — Application Log</h2>
+<p style="font-size:12px;color:)HTML" + muted + R"HTML(;margin:8px 0 16px">)HTML"
++ EscapeHTML(logPath) + R"HTML(</p>
+<table>)HTML" + rows + R"HTML(</table>
+</body></html>)HTML";
+
+    m_webView->SetPage(wxString::FromUTF8(html), "");
+    SetStatusText("Viewing logs — use View > View Document to return");
+}
+
+void MDViewerFrame::OnViewDoc(wxCommandEvent&) {
+    LoadAndRender();
+}
+
 void MDViewerFrame::OnThemeLight(wxCommandEvent&) {
     if (m_darkMode) {
         m_darkMode = false;
