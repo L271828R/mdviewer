@@ -45,6 +45,9 @@ enum {
     ID_THEME_DARK,
     ID_VIEW_LOGS,
     ID_VIEW_DOC,
+    ID_FONT_INCREASE,
+    ID_FONT_DECREASE,
+    ID_FONT_RESET,
 };
 
 class MDViewerFrame : public wxFrame {
@@ -55,23 +58,10 @@ private:
     wxWebView* m_webView;
     wxString   m_filePath;
     bool       m_darkMode;
+    int        m_fontSizePercent;
 
     void LoadAndRender();
     std::string ReadFile(const std::string& path);
-
-    // Markdown → HTML body
-    std::string RenderMarkdown(const std::string& md);
-
-    // Inline formatting: bold, italic, code, links, images
-    std::string ProcessInline(const std::string& text);
-
-    // HTML-escape a raw string (no markdown processing)
-    static std::string EscapeHTML(const std::string& text);
-
-    // Wrap body in full HTML page with CSS, Mermaid.js and zoom JS
-    std::string WrapWithTemplate(const std::string& body,
-                                 const std::string& title,
-                                 bool darkMode);
 
     void OnOpen(wxCommandEvent& evt);
     void OnReload(wxCommandEvent& evt);
@@ -79,6 +69,10 @@ private:
     void OnThemeDark(wxCommandEvent& evt);
     void OnViewLogs(wxCommandEvent& evt);
     void OnViewDoc(wxCommandEvent& evt);
+    void OnFontIncrease(wxCommandEvent& evt);
+    void OnFontDecrease(wxCommandEvent& evt);
+    void OnFontReset(wxCommandEvent& evt);
+    void OnScriptMessage(wxWebViewEvent& evt);
     void OnExit(wxCommandEvent& evt);
     void OnClose(wxCloseEvent& evt);
 

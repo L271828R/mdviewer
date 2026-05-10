@@ -82,12 +82,29 @@ add_custom_target(gen_hljs_headers ALL
     DEPENDS "${HLJS_JS_H}" "${HLJS_CSS_LIGHT_H}" "${HLJS_CSS_DARK_H}")
 # ─────────────────────────────────────────────────────────────────────────────
 
-set(SOURCES main.cpp mdviewer.cpp)
+set(SOURCES
+    src/main.cpp
+    src/mdviewer.cpp
+    src/markdown.cpp
+    src/html_template.cpp
+)
 add_executable(mdviewer ${SOURCES})
 add_dependencies(mdviewer gen_mermaid_header gen_hljs_headers)
 
-target_include_directories(mdviewer PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(mdviewer PRIVATE src ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(mdviewer PRIVATE ${wxWidgets_LIBRARIES})
+
+# ── Tests (no wxWidgets dependency) ──────────────────────────────────────────
+add_executable(test_mdviewer
+    test_dark_mode.cpp
+    src/markdown.cpp
+    src/html_template.cpp
+)
+add_dependencies(test_mdviewer gen_mermaid_header gen_hljs_headers)
+target_include_directories(test_mdviewer PRIVATE src ${CMAKE_CURRENT_BINARY_DIR})
+
+enable_testing()
+add_test(NAME dark_mode COMMAND test_mdviewer)
 
 if(APPLE)
     find_library(WEBKIT_FW WebKit)

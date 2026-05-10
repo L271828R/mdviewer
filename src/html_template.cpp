@@ -1,0 +1,343 @@
+#include "html_template.h"
+#include "markdown.h"
+#include "mermaid_js.h"
+#include "hljs_js.h"
+#include "hljs_css_light.h"
+#include "hljs_css_dark.h"
+#include <cstdio>
+#include <string>
+
+static const std::string& GetMermaidJS() {
+    static std::string cached;
+    if (cached.empty()) {
+        cached.assign(reinterpret_cast<const char*>(mermaid_js_data), mermaid_js_data_len);
+        const std::string bad  = "</script>";
+        const std::string safe = "<\\/script>";
+        size_t pos = 0;
+        while ((pos = cached.find(bad, pos)) != std::string::npos) {
+            cached.replace(pos, bad.size(), safe);
+            pos += safe.size();
+        }
+    }
+    return cached;
+}
+
+static const std::string& GetHighlightJS() {
+    static std::string cached;
+    if (cached.empty()) {
+        cached.assign(reinterpret_cast<const char*>(hljs_js_data), hljs_js_data_len);
+        const std::string bad  = "</script>";
+        const std::string safe = "<\\/script>";
+        size_t pos = 0;
+        while ((pos = cached.find(bad, pos)) != std::string::npos) {
+            cached.replace(pos, bad.size(), safe);
+            pos += safe.size();
+        }
+    }
+    return cached;
+}
+
+static const std::string& GetHighlightCSSLight() {
+    static std::string cached;
+    if (cached.empty())
+        cached.assign(reinterpret_cast<const char*>(hljs_css_light_data), hljs_css_light_data_len);
+    return cached;
+}
+
+static const std::string& GetHighlightCSSDark() {
+    static std::string cached;
+    if (cached.empty())
+        cached.assign(reinterpret_cast<const char*>(hljs_css_dark_data), hljs_css_dark_data_len);
+    return cached;
+}
+
+std::string BuildHTML(const std::string& body,
+                      const std::string& title,
+                      bool darkMode,
+                      int fontSizePercent) {
+    const std::string htmlClass    = darkMode ? " class=\"dark\"" : "";
+    const std::string mermaidTheme = darkMode ? "dark" : "default";
+    char fsBuf[32];
+    snprintf(fsBuf, sizeof(fsBuf), "%.4g", 16.0 * fontSizePercent / 100.0);
+    const std::string fsPx       = std::string(fsBuf) + "px";
+    const std::string fontPctStr = std::to_string(fontSizePercent);
+
+    return R"HTML(<!DOCTYPE html>
+<html lang="en")HTML" + htmlClass + R"HTML(>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>)HTML" + EscapeHTML(title) + R"HTML(</title>
+<script>)HTML" + GetMermaidJS() + R"HTML(</script>
+<script>)HTML" + GetHighlightJS() + R"HTML(</script>
+<style>)HTML" + (darkMode ? GetHighlightCSSDark() : GetHighlightCSSLight()) + R"HTML(</style>
+<style>
+/* ── Theme tokens ───────────────────────────────────────────────────────── */
+:root {
+  --bg:            #ffffff;
+  --surface:       #f6f8fa;
+  --surface2:      #fafbfc;
+  --text:          #24292f;
+  --text-muted:    #57606a;
+  --border:        #d0d7de;
+  --link:          #0969da;
+  --link-hover:    #0550ae;
+  --code-inline:   rgba(175,184,193,0.2);
+  --del:           #656d76;
+  --zm-svg-bg:     #ffffff;
+  --mermaid-hover: rgba(9,105,218,0.16);
+  --mermaid-ring:  rgba(9,105,218,0.53);
+}
+.dark {
+  --bg:            #0d1117;
+  --surface:       #161b22;
+  --surface2:      #1c2128;
+  --text:          #e6edf3;
+  --text-muted:    #8b949e;
+  --border:        #30363d;
+  --link:          #58a6ff;
+  --link-hover:    #79c0ff;
+  --code-inline:   rgba(110,118,129,0.4);
+  --del:           #8b949e;
+  --zm-svg-bg:     #1e2430;
+  --mermaid-hover: rgba(88,166,255,0.12);
+  --mermaid-ring:  rgba(88,166,255,0.45);
+}
+
+/* ── Reset & base ───────────────────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  font-size:)HTML" + fsPx + R"HTML(;line-height:1.65;
+  color:var(--text);background:var(--bg);
+  padding:32px 24px;max-width:960px;margin:0 auto;
+}
+
+/* ── Typography ─────────────────────────────────────────────────────────── */
+h1,h2,h3,h4,h5,h6{margin:24px 0 16px;font-weight:600;line-height:1.25;color:var(--text)}
+h1{font-size:2em;  border-bottom:1px solid var(--border);padding-bottom:.3em}
+h2{font-size:1.5em;border-bottom:1px solid var(--border);padding-bottom:.3em}
+h3{font-size:1.25em}
+h4{font-size:1em}
+p{margin-bottom:16px}
+a{color:var(--link);text-decoration:none}
+a:hover{color:var(--link-hover);text-decoration:underline}
+strong{font-weight:600}
+del{color:var(--del)}
+
+/* ── Code ───────────────────────────────────────────────────────────────── */
+code{
+  font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+  font-size:85%;background:var(--code-inline);
+  padding:.2em .4em;border-radius:3px;color:var(--text);
+}
+pre{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:6px;padding:16px;overflow-x:auto;margin-bottom:16px;
+}
+pre code{background:none;padding:0;font-size:87.5%;border:none}
+.hljs{background:transparent}
+
+/* ── Blockquote ─────────────────────────────────────────────────────────── */
+blockquote{
+  padding:0 1em;color:var(--text-muted);
+  border-left:.25em solid var(--border);margin-bottom:16px;
+}
+
+/* ── Lists ──────────────────────────────────────────────────────────────── */
+ul,ol{padding-left:2em;margin-bottom:16px}
+li{margin:4px 0;color:var(--text)}
+
+/* ── Media ──────────────────────────────────────────────────────────────── */
+img{max-width:100%;height:auto;border-radius:4px}
+
+/* ── Rule ───────────────────────────────────────────────────────────────── */
+hr{height:.25em;padding:0;margin:24px 0;background:var(--border);border:0}
+
+/* ── Table ──────────────────────────────────────────────────────────────── */
+table{border-collapse:collapse;margin-bottom:16px;width:100%}
+th,td{border:1px solid var(--border);padding:6px 13px;text-align:left;color:var(--text)}
+th{background:var(--surface);font-weight:600}
+tr:nth-child(even) td{background:var(--surface)}
+
+/* ── Mermaid wrapper ────────────────────────────────────────────────────── */
+.mermaid-wrapper{
+  display:inline-block;cursor:zoom-in;
+  border:1px solid var(--border);border-radius:6px;
+  padding:20px;margin-bottom:16px;
+  background:var(--surface2);
+  transition:box-shadow .18s,border-color .18s;
+  width:100%;text-align:center;
+}
+.mermaid-wrapper:hover{
+  box-shadow:0 0 0 3px var(--mermaid-hover);
+  border-color:var(--mermaid-ring);
+}
+
+/* ── Zoom modal ─────────────────────────────────────────────────────────── */
+#zm-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);
+  z-index:9999;align-items:center;justify-content:center;
+}
+#zm-overlay.open{display:flex}
+#zm-stage{
+  position:relative;width:90vw;height:90vh;
+  overflow:hidden;cursor:grab;user-select:none;
+}
+#zm-stage.dragging{cursor:grabbing}
+#zm-inner{
+  display:flex;align-items:center;justify-content:center;
+  width:100%;height:100%;transform-origin:center center;
+}
+#zm-inner svg{
+  max-width:85vw;max-height:85vh;
+  background:var(--zm-svg-bg);border-radius:8px;padding:24px;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+}
+#zm-close{
+  position:fixed;top:14px;right:18px;background:rgba(255,255,255,.12);
+  border:none;color:#fff;font-size:20px;width:36px;height:36px;
+  border-radius:50%;cursor:pointer;z-index:10001;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .15s;
+}
+#zm-close:hover{background:rgba(255,255,255,.28)}
+#zm-hint{
+  position:fixed;bottom:14px;left:50%;transform:translateX(-50%);
+  color:rgba(255,255,255,.55);font-size:12px;pointer-events:none;white-space:nowrap;
+}
+#zm-scale{
+  position:fixed;top:16px;left:50%;transform:translateX(-50%);
+  color:rgba(255,255,255,.7);font-size:12px;background:rgba(0,0,0,.4);
+  padding:3px 10px;border-radius:20px;pointer-events:none;
+}
+</style>
+</head>
+<body>
+)HTML" + body + R"HTML(
+
+<!-- ── Zoom modal ───────────────────────────────────────────────────────── -->
+<div id="zm-overlay">
+  <button id="zm-close" title="Close (Esc)">&#x2715;</button>
+  <div id="zm-stage">
+    <div id="zm-inner"></div>
+  </div>
+  <div id="zm-hint">Scroll to zoom &nbsp;·&nbsp; Drag to pan &nbsp;·&nbsp; ESC to close</div>
+  <div id="zm-scale">100%</div>
+</div>
+
+<script>
+// ── Highlight.js ─────────────────────────────────────────────────────────
+hljs.highlightAll();
+
+// ── Mermaid init (theme set by C++ based on current mode) ────────────────
+mermaid.initialize({startOnLoad:true, theme:')HTML" + mermaidTheme + R"HTML(', securityLevel:'loose'});
+
+// ── Zoom state ───────────────────────────────────────────────────────────
+let zmScale = 1, zmTX = 0, zmTY = 0;
+let zmDrag = false, zmDX = 0, zmDY = 0;
+const zmInner = document.getElementById('zm-inner');
+const zmStage = document.getElementById('zm-stage');
+const zmScaleLabel = document.getElementById('zm-scale');
+
+function zmApply() {
+  zmInner.style.transform = `translate(${zmTX}px,${zmTY}px) scale(${zmScale})`;
+  zmScaleLabel.textContent = Math.round(zmScale * 100) + '%';
+}
+
+function zmOpen(svgHTML) {
+  zmScale=1; zmTX=0; zmTY=0;
+  zmInner.innerHTML = svgHTML;
+  const svg = zmInner.querySelector('svg');
+  if (svg) {
+    svg.removeAttribute('width');
+    svg.removeAttribute('height');
+    svg.style.maxWidth  = '85vw';
+    svg.style.maxHeight = '85vh';
+  }
+  zmApply();
+  document.getElementById('zm-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function zmClose() {
+  document.getElementById('zm-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// Click on any mermaid wrapper → zoom (event delegation, works after async render)
+document.addEventListener('click', e => {
+  if (e.target.closest('#zm-overlay')) return;
+  const w = e.target.closest('.mermaid-wrapper');
+  if (w) { const svg = w.querySelector('svg'); if (svg) zmOpen(svg.outerHTML); }
+});
+
+document.getElementById('zm-close').addEventListener('click', zmClose);
+document.getElementById('zm-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('zm-overlay')) zmClose();
+});
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') zmClose(); });
+
+zmStage.addEventListener('wheel', e => {
+  e.preventDefault();
+  zmScale = Math.min(Math.max(zmScale * (e.deltaY < 0 ? 1.12 : 0.9), 0.08), 20);
+  zmApply();
+}, {passive:false});
+
+zmStage.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  zmDrag = true; zmDX = e.clientX - zmTX; zmDY = e.clientY - zmTY;
+  zmStage.classList.add('dragging'); e.preventDefault();
+});
+document.addEventListener('mousemove', e => {
+  if (!zmDrag) return;
+  zmTX = e.clientX - zmDX; zmTY = e.clientY - zmDY; zmApply();
+});
+document.addEventListener('mouseup', () => {
+  zmDrag = false; zmStage.classList.remove('dragging');
+});
+
+let lastDist = 0;
+zmStage.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    zmDrag = true; zmDX = e.touches[0].clientX - zmTX; zmDY = e.touches[0].clientY - zmTY;
+  } else if (e.touches.length === 2) {
+    zmDrag = false;
+    lastDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX,
+                          e.touches[0].clientY - e.touches[1].clientY);
+  }
+  e.preventDefault();
+}, {passive:false});
+zmStage.addEventListener('touchmove', e => {
+  if (e.touches.length === 1 && zmDrag) {
+    zmTX = e.touches[0].clientX - zmDX; zmTY = e.touches[0].clientY - zmDY; zmApply();
+  } else if (e.touches.length === 2) {
+    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX,
+                         e.touches[0].clientY - e.touches[1].clientY);
+    if (lastDist > 0) {
+      zmScale = Math.min(Math.max(zmScale * (d / lastDist), 0.08), 20); zmApply();
+    }
+    lastDist = d;
+  }
+  e.preventDefault();
+}, {passive:false});
+zmStage.addEventListener('touchend', () => { zmDrag = false; lastDist = 0; });
+
+// Ctrl/Meta+wheel — adjust document font size
+(function(){
+  var pct = )HTML" + fontPctStr + R"HTML(;
+  document.addEventListener('wheel', function(e){
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    pct = Math.max(50, Math.min(200, pct + (e.deltaY < 0 ? 10 : -10)));
+    document.body.style.fontSize = (16 * pct / 100) + 'px';
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.fontSizeChange)
+      window.webkit.messageHandlers.fontSizeChange.postMessage(String(pct));
+  }, {passive:false});
+})();
+</script>
+</body>
+</html>
+)HTML";
+}
