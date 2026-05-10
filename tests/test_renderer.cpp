@@ -112,11 +112,15 @@ int main() {
         }
     }
 
-    // 9. GetLLMReadme() documents the copy button.
+    // 9. GetLLMReadme() documents the copy button and text-vs-code fence rule.
     {
         std::string readme = GetLLMReadme();
-        if (readme.find("Copy") == std::string::npos) {
-            std::cerr << "FAIL [llm-copy]: copy button not documented in --llm output\n";
+        bool hasCopy     = readme.find("Copy") != std::string::npos;
+        bool hasTextRule = readme.find("no code") != std::string::npos;
+        bool hasLangTable= readme.find("bash") != std::string::npos;
+        if (!hasCopy || !hasTextRule || !hasLangTable) {
+            std::cerr << "FAIL [llm-copy]: --llm output missing copy docs, "
+                         "text-fence rule, or language table\n";
             ++failures;
         } else {
             std::cout << "PASS [llm-copy]\n";

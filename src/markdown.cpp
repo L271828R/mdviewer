@@ -550,17 +550,42 @@ Title       Subtitle
 
 ### Fenced code blocks with syntax highlighting
 
-Use triple backticks and a language tag:
+Always choose the language tag that matches the content:
 
-    ```cpp
-    int main() { return 0; }
-    ```
+| Content | Tag to use |
+|---|---|
+| C++ source | `cpp` |
+| Python source | `python` |
+| JavaScript / TypeScript | `js` / `ts` |
+| Rust | `rust` |
+| Go | `go` |
+| Shell / Bash | `bash` |
+| x86 assembly (NASM) | `nasm` |
+| SQL | `sql` |
+| JSON | `json` |
+| YAML | `yaml` |
+| Any other language | its highlight.js identifier |
+| ASCII art, diagrams, terminal output, prose — **no code** | `text` |
 
-Any language identifier recognised by highlight.js works (cpp, python, js,
-ts, rust, go, java, bash, sql, json, yaml, …).
+**Rule:** use `text` only when the block contains no code — ASCII art,
+box-drawing diagrams, terminal session output, or plain prose excerpts.
+The moment the block contains keywords, strings, or identifiers from a
+programming language, switch to that language's tag so the reader gets
+syntax highlighting and the correct Copy-button label.
+
+```cpp
+// correct — C++ gets highlighted
+int main() { return 0; }
+```
+
+```text
+┌─────────────────────┐
+│  ASCII art box      │  ← correct use of text: no code inside
+└─────────────────────┘
+```
 
 A **Copy** button appears on hover in the top-right corner of every fenced
-code block. Clicking it copies the block's text to the Mac clipboard.
+code block. Clicking it copies the block's plain text to the Mac clipboard.
 
 ### Diagrams (Mermaid)
 
