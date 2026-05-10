@@ -1,8 +1,11 @@
 #include <wx/wx.h>
 #include "mdviewer.h"
+#include "markdown.h"
 #include <unistd.h>
 #include <fcntl.h>
 #include <spawn.h>
+#include <cstdio>
+#include <cstring>
 
 extern char **environ;
 
@@ -14,6 +17,11 @@ public:
 wxIMPLEMENT_APP_NO_MAIN(MDViewerApp);
 
 int main(int argc, char* argv[]) {
+    if (argc >= 2 && std::strcmp(argv[1], "--llm") == 0) {
+        std::fputs(GetLLMReadme().c_str(), stdout);
+        return 0;
+    }
+
     // When launched from a terminal, re-exec self as a detached process.
     // posix_spawn (not fork) gives the child fresh Mach/XPC state so
     // WKWebView's rendering pipeline initialises correctly.

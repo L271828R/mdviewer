@@ -5,7 +5,7 @@
 Always run the test suite **before and after** making any code changes.
 
 ```bash
-c++ -std=c++17 -o test_dark_mode test_dark_mode.cpp && ./test_dark_mode
+cmake --build build --target test_mdviewer && ./build/test_mdviewer
 ```
 
 All tests must pass before committing.
@@ -32,7 +32,7 @@ Headers are the public interface. A reader should be able to understand a module
 ## Adding features
 
 1. Run tests — confirm they pass.
-2. Make the change in the appropriate file (not always `mdviewer.cpp`).
-3. Add or update a test that would have caught a regression.
-4. Run tests again — confirm they still pass.
+2. **Write a failing test first.** Add the test that exercises the new behaviour before writing any implementation. Confirm the test suite now fails on the new case.
+3. Make the change in the appropriate file (not always `mdviewer.cpp`).
+4. Run tests again — confirm all tests now pass (including the one you added).
 5. Build with `bash build.sh` — zero warnings expected.

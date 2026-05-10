@@ -198,6 +198,10 @@ std::string RenderMarkdown(const std::string& md) {
     char fenceChar = '`';
     std::string mermaidBuf;
 
+    bool inTidbit = false;
+    std::string tidbitSpeaker;
+    std::string tidbitBuf;
+
     bool inUL = false;
     bool inOL = false;
     bool inBQ = false;
@@ -234,6 +238,32 @@ std::string RenderMarkdown(const std::string& md) {
 
     for (size_t i = 0; i < lines.size(); i++) {
         const std::string& raw = lines[i];
+
+        // :::tidbit[Speaker] ... ::: block
+        if (!inTidbit && raw.size() > 10 && raw.substr(0, 10) == ":::tidbit[") {
+            size_t close = raw.find(']', 10);
+            if (close != std::string::npos) {
+                flushParagraph(); closeLists(); closeBlockquote(); closeTable();
+                tidbitSpeaker = raw.substr(10, close - 10);
+                tidbitBuf.clear();
+                inTidbit = true;
+                continue;
+            }
+        }
+        if (inTidbit) {
+            if (raw == ":::") {
+                html += "<details class=\"tidbit\">\n"
+                        "<summary>" + EscapeHTML(tidbitSpeaker) + "</summary>\n"
+                        "<div class=\"tidbit-body\">" + RenderMarkdown(tidbitBuf) + "</div>\n"
+                        "</details>\n";
+                inTidbit = false;
+                tidbitBuf.clear();
+                tidbitSpeaker.clear();
+            } else {
+                tidbitBuf += raw + "\n";
+            }
+            continue;
+        }
 
         if (inCode || inMermaid) {
             if (isClosingFence(raw, fenceChar)) {
@@ -442,6 +472,148 @@ std::string RenderMarkdown(const std::string& md) {
     if (inCode)    html += "</code></pre>\n";
     if (inMermaid) html += "<div class=\"mermaid-wrapper\"><div class=\"mermaid\">\n"
                            + mermaidBuf + "</div></div>\n";
+    if (inTidbit)  html += "<details class=\"tidbit\">\n"
+                           "<summary>" + EscapeHTML(tidbitSpeaker) + "</summary>\n"
+                           "<div class=\"tidbit-body\">" + RenderMarkdown(tidbitBuf) + "</div>\n"
+                           "</details>\n";
 
     return html;
+}
+
+std::string GetLLMReadme() {
+    return R"MD(# MDViewer — Syntax Reference for LLM Authors
+
+This is the authoritative reference for markdown that MDViewer renders.
+Include it in your context before generating documents for MDViewer.
+
+---
+
+## Standard syntax
+
+### Headings
+
+Use `#` through `######` for H1–H6, or setext underlines for H1/H2:
+
+```
+# H1        ## H2       ### H3
+Title       Subtitle
+=====       --------
+```
+
+### Emphasis
+
+```
+**bold**   __bold__   *italic*   _italic_   ***bold italic***   ~~strikethrough~~
+```
+
+### Inline code
+
+```
+`code snippet`
+```
+
+### Links and images
+
+```
+[link text](https://example.com)
+![alt text](path/to/image.png)
+<https://auto-linked-url.com>
+```
+
+### Blockquote
+
+```
+> Quoted text.
+```
+
+### Horizontal rule
+
+```
+---
+```
+
+### Lists
+
+```
+- unordered       1. ordered
+* unordered       2. ordered
++ unordered
+```
+
+### Tables
+
+```
+| Column A | Column B |
+|----------|----------|
+| cell     | cell     |
+```
+
+### Fenced code blocks with syntax highlighting
+
+Use triple backticks and a language tag:
+
+    ```cpp
+    int main() { return 0; }
+    ```
+
+Any language identifier recognised by highlight.js works (cpp, python, js,
+ts, rust, go, java, bash, sql, json, yaml, …).
+
+### Diagrams (Mermaid)
+
+    ```mermaid
+    graph LR
+        A --> B --> C
+    ```
+
+Click the rendered diagram to zoom in.
+
+---
+
+## MDViewer extensions
+
+### Tidbit — collapsible aside from a named voice
+
+```
+:::tidbit[Speaker Name]
+Content goes here. Full markdown supported inside.
+:::
+```
+
+Renders as a collapsed `<details>` widget. The reader clicks to reveal it.
+Use tidbits for entertaining or supplementary commentary alongside chapters —
+quotes, opinions, or colour from a named persona.
+
+**Example:**
+
+```
+:::tidbit[Bjarne Stroustrup]
+"I could have hidden vtables entirely. I chose not to.
+The indirection is the point — **you** decide what's virtual."
+:::
+```
+
+**Rules:**
+- `Speaker Name` is displayed in the collapsed summary line.
+- The body supports any MDViewer markdown: paragraphs, bold/italic, inline
+  code, lists, blockquotes. Do not nest tidbits.
+- Put a blank line before and after the block for clean paragraph spacing.
+
+**Suggested voices for technical documents:**
+- Language inventors: Bjarne Stroustrup (C++), James Gosling (Java),
+  Guido van Rossum (Python), Yukihiro Matsumoto (Ruby)
+- Systems pioneers: Dennis Ritchie, Ken Thompson, Linus Torvalds
+- Industry figures: Bill Gates, Donald Knuth, Edsger Dijkstra
+- Historical: Ada Lovelace, Alan Turing, Grace Hopper
+
+---
+
+## What MDViewer does NOT support
+
+- Raw HTML passthrough (`<div>`, `<span>`, etc. are not rendered)
+- Footnotes
+- Definition lists
+- Task checkboxes (`- [x]`)
+- Nested tidbits
+)MD";
 }

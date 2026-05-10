@@ -96,7 +96,7 @@ target_link_libraries(mdviewer PRIVATE ${wxWidgets_LIBRARIES})
 
 # ── Tests (no wxWidgets dependency) ──────────────────────────────────────────
 add_executable(test_mdviewer
-    test_dark_mode.cpp
+    tests/test_renderer.cpp
     src/markdown.cpp
     src/html_template.cpp
 )

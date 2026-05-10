@@ -144,6 +144,21 @@ blockquote{
   border-left:.25em solid var(--border);margin-bottom:16px;
 }
 
+/* ── Tidbit ─────────────────────────────────────────────────────────────── */
+details.tidbit{
+  border:1px solid var(--border);border-radius:6px;
+  margin-bottom:16px;background:var(--surface);
+}
+details.tidbit summary{
+  padding:10px 14px;cursor:pointer;font-style:italic;
+  color:var(--text-muted);user-select:none;list-style:none;
+}
+details.tidbit summary::before{content:"💬 "}
+details.tidbit summary::-webkit-details-marker{display:none}
+details.tidbit[open] summary{border-bottom:1px solid var(--border)}
+.tidbit-body{padding:12px 16px}
+.tidbit-body p:last-child{margin-bottom:0}
+
 /* ── Lists ──────────────────────────────────────────────────────────────── */
 ul,ol{padding-left:2em;margin-bottom:16px}
 li{margin:4px 0;color:var(--text)}

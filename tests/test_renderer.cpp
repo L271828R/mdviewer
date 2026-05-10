@@ -1,8 +1,8 @@
-// test_dark_mode.cpp
+// tests/test_renderer.cpp
 // Built via CMake: cmake --build build --target test_mdviewer && ./build/test_mdviewer
-// Or manually:    c++ -std=c++17 -Ibuild -o test_mdviewer test_dark_mode.cpp markdown.cpp html_template.cpp
 
 #include "html_template.h"
+#include "markdown.h"
 #include <iostream>
 #include <string>
 
@@ -52,6 +52,40 @@ int main() {
             ++failures;
         } else {
             std::cout << "PASS [font-size]\n";
+        }
+    }
+
+    // 5. GetLLMReadme() covers the tidbit extension and core syntax.
+    {
+        std::string readme = GetLLMReadme();
+        bool hasTidbit  = readme.find(":::tidbit") != std::string::npos;
+        bool hasMermaid = readme.find("mermaid")   != std::string::npos;
+        bool hasHeading = readme.find("# ")        != std::string::npos;
+        if (!hasTidbit || !hasMermaid || !hasHeading) {
+            std::cerr << "FAIL [llm-readme]: missing tidbit=" << hasTidbit
+                      << " mermaid=" << hasMermaid << " heading=" << hasHeading << "\n";
+            ++failures;
+        } else {
+            std::cout << "PASS [llm-readme]\n";
+        }
+    }
+
+    // 6. :::tidbit[Speaker] block renders as a <details> widget.
+    {
+        std::string md =
+            ":::tidbit[Bjarne Stroustrup]\n"
+            "vtables are a feature, not a bug.\n"
+            ":::\n";
+        std::string html = RenderMarkdown(md);
+        bool hasDetails = html.find("<details class=\"tidbit\">") != std::string::npos;
+        bool hasSpeaker = html.find("Bjarne Stroustrup") != std::string::npos;
+        bool hasContent = html.find("vtables are a feature") != std::string::npos;
+        if (!hasDetails || !hasSpeaker || !hasContent) {
+            std::cerr << "FAIL [tidbit]: expected <details class=\"tidbit\"> with speaker and content\n"
+                      << "  got: " << html << "\n";
+            ++failures;
+        } else {
+            std::cout << "PASS [tidbit]\n";
         }
     }
 
