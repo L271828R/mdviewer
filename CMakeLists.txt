@@ -87,6 +87,7 @@ set(SOURCES
     src/mdviewer.cpp
     src/markdown.cpp
     src/html_template.cpp
+    src/inspector.mm
 )
 add_executable(mdviewer ${SOURCES})
 add_dependencies(mdviewer gen_mermaid_header gen_hljs_headers)

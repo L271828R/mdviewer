@@ -559,6 +559,9 @@ Use triple backticks and a language tag:
 Any language identifier recognised by highlight.js works (cpp, python, js,
 ts, rust, go, java, bash, sql, json, yaml, …).
 
+A **Copy** button appears on hover in the top-right corner of every fenced
+code block. Clicking it copies the block's text to the Mac clipboard.
+
 ### Diagrams (Mermaid)
 
     ```mermaid

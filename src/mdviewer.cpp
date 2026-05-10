@@ -1,10 +1,13 @@
 #include "mdviewer.h"
 #include "markdown.h"
 #include "html_template.h"
+#include "inspector.h"
 #include <wx/webview.h>
 #include <wx/filedlg.h>
 #include <wx/filename.h>
 #include <wx/config.h>
+#include <wx/clipbrd.h>
+#include <wx/dataobj.h>
 #include <fstream>
 #include <sstream>
 
@@ -76,6 +79,8 @@ MDViewerFrame::MDViewerFrame(const wxString& filePath)
 
     m_webView = wxWebView::New(this, wxID_ANY, "about:blank");
     m_webView->AddScriptMessageHandler("fontSizeChange");
+    m_webView->AddScriptMessageHandler("clipboardCopy");
+    EnableWebInspector(m_webView);
     CallAfter([this]() { LoadAndRender(); });
 }
 
@@ -250,8 +255,15 @@ void MDViewerFrame::OnFontReset(wxCommandEvent&) {
 }
 
 void MDViewerFrame::OnScriptMessage(wxWebViewEvent& evt) {
+    if (evt.GetMessageHandler() == "clipboardCopy") {
+        if (wxTheClipboard->Open()) {
+            wxTheClipboard->SetData(new wxTextDataObject(evt.GetString()));
+            wxTheClipboard->Close();
+        }
+        return;
+    }
     long val;
-    if (evt.GetURL().ToLong(&val)) {
+    if (evt.GetString().ToLong(&val)) {
         m_fontSizePercent = (int)std::max(50L, std::min(200L, val));
         wxConfig cfg("MDViewer");
         cfg.Write("fontSizePercent", (long)m_fontSizePercent);

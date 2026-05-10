@@ -137,6 +137,18 @@ pre{
 }
 pre code{background:none;padding:0;font-size:87.5%;border:none}
 .hljs{background:transparent}
+.code-wrapper{position:relative;display:block;margin-bottom:16px}
+.code-wrapper pre{margin-bottom:0}
+.copy-btn{
+  position:absolute;top:8px;right:8px;
+  padding:3px 9px;font-size:11px;line-height:1.5;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:4px;cursor:pointer;color:var(--text-muted);
+  opacity:0;transition:opacity .15s,background .15s;
+}
+.code-wrapper:hover .copy-btn{opacity:1}
+.copy-btn:hover{background:var(--border)}
+.copy-btn.copied{color:var(--link)}
 
 /* ── Blockquote ─────────────────────────────────────────────────────────── */
 blockquote{
@@ -244,6 +256,28 @@ tr:nth-child(even) td{background:var(--surface)}
 <script>
 // ── Highlight.js ─────────────────────────────────────────────────────────
 hljs.highlightAll();
+
+// ── Copy buttons on fenced code blocks ───────────────────────────────────
+document.querySelectorAll('pre code').forEach(function(block) {
+  var pre = block.parentElement;
+  var wrapper = document.createElement('div');
+  wrapper.className = 'code-wrapper';
+  pre.parentNode.insertBefore(wrapper, pre);
+  wrapper.appendChild(pre);
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.textContent = 'Copy';
+  btn.addEventListener('click', function() {
+    var text = block.innerText;
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.clipboardCopy) {
+      window.webkit.messageHandlers.clipboardCopy.postMessage(text);
+    }
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+  });
+  wrapper.appendChild(btn);
+});
 
 // ── Mermaid init (theme set by C++ based on current mode) ────────────────
 mermaid.initialize({startOnLoad:true, theme:')HTML" + mermaidTheme + R"HTML(', securityLevel:'loose'});

@@ -4,6 +4,7 @@
 #include "html_template.h"
 #include "markdown.h"
 #include <iostream>
+#include <fstream>
 #include <string>
 
 int main() {
@@ -86,6 +87,87 @@ int main() {
             ++failures;
         } else {
             std::cout << "PASS [tidbit]\n";
+        }
+    }
+
+    // 7. Copy button CSS is emitted (.copy-btn class present).
+    {
+        std::string html = BuildHTML("", "test", false, 100);
+        if (html.find(".copy-btn") == std::string::npos) {
+            std::cerr << "FAIL [copy-btn-css]: '.copy-btn' not found in HTML output\n";
+            ++failures;
+        } else {
+            std::cout << "PASS [copy-btn-css]\n";
+        }
+    }
+
+    // 8. Copy button JS sends via the clipboardCopy message handler.
+    {
+        std::string html = BuildHTML("", "test", false, 100);
+        if (html.find("clipboardCopy") == std::string::npos) {
+            std::cerr << "FAIL [copy-btn-js]: 'clipboardCopy' handler not found in HTML output\n";
+            ++failures;
+        } else {
+            std::cout << "PASS [copy-btn-js]\n";
+        }
+    }
+
+    // 9. GetLLMReadme() documents the copy button.
+    {
+        std::string readme = GetLLMReadme();
+        if (readme.find("Copy") == std::string::npos) {
+            std::cerr << "FAIL [llm-copy]: copy button not documented in --llm output\n";
+            ++failures;
+        } else {
+            std::cout << "PASS [llm-copy]\n";
+        }
+    }
+
+    // 10. Copy button must NOT be appended inside <pre> — doing so causes WebKit
+    //     to re-parse the element and strip hljs highlight spans. The button must
+    //     go into a wrapper div that sits around the <pre>, not inside it.
+    {
+        std::string html = BuildHTML("", "test", false, 100);
+        if (html.find("block.parentElement.appendChild") != std::string::npos) {
+            std::cerr << "FAIL [copy-btn-outside-pre]: copy button is appended inside <pre>; "
+                         "use a wrapper div to avoid breaking hljs highlighting\n";
+            ++failures;
+        } else {
+            std::cout << "PASS [copy-btn-outside-pre]\n";
+        }
+    }
+
+    // 11. hljs actually highlights Python code — run the bundled highlight.min.js
+    //     via Node and verify keyword/string spans appear on a hello-world block.
+    {
+        int rc = std::system(
+            "node tests/test_hljs.js highlight.min.js 2>&1"
+        );
+        if (rc != 0) {
+            std::cerr << "FAIL [hljs-python]: syntax highlighting test failed "
+                         "(see output above)\n";
+            ++failures;
+        } else {
+            std::cout << "PASS [hljs-python]\n";
+        }
+    }
+
+    // 12. GetString() must be used for script message payloads, not GetURL().
+    //     GetURL() returns the page URL (file:///...), not the postMessage value.
+    {
+        std::ifstream src("src/mdviewer.cpp");
+        std::string code((std::istreambuf_iterator<char>(src)),
+                          std::istreambuf_iterator<char>());
+        bool usesGetString = code.find("evt.GetString()") != std::string::npos;
+        bool usesGetURLForClipboard =
+            code.find("clipboardCopy") != std::string::npos &&
+            code.find("SetData(new wxTextDataObject(evt.GetURL()") != std::string::npos;
+        if (!usesGetString || usesGetURLForClipboard) {
+            std::cerr << "FAIL [getstring-not-geturl]: script message payload must be "
+                         "read via GetString(), not GetURL() (GetURL returns the page URL)\n";
+            ++failures;
+        } else {
+            std::cout << "PASS [getstring-not-geturl]\n";
         }
     }
 
