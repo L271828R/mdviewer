@@ -22,6 +22,7 @@ wxBEGIN_EVENT_TABLE(MDViewerFrame, wxFrame)
     EVT_MENU(ID_FONT_DECREASE, MDViewerFrame::OnFontDecrease)
     EVT_MENU(ID_FONT_RESET,    MDViewerFrame::OnFontReset)
     EVT_WEBVIEW_SCRIPT_MESSAGE_RECEIVED(wxID_ANY, MDViewerFrame::OnScriptMessage)
+    EVT_MENU(wxID_CLOSE,     MDViewerFrame::OnExit)
     EVT_MENU(wxID_EXIT,      MDViewerFrame::OnExit)
     EVT_CLOSE(               MDViewerFrame::OnClose)
 wxEND_EVENT_TABLE()
@@ -50,6 +51,7 @@ MDViewerFrame::MDViewerFrame(const wxString& filePath)
     file->Append(wxID_OPEN,  "&Open…\tCtrl+O");
     file->Append(ID_RELOAD,  "&Reload\tCtrl+R");
     file->AppendSeparator();
+    file->Append(wxID_CLOSE, "&Close Window\tCtrl+W");
     file->Append(wxID_EXIT,  "E&xit\tCtrl+Q");
     bar->Append(file, "&File");
 
