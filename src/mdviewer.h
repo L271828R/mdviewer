@@ -5,41 +5,7 @@
 #include <wx/textctrl.h>
 #include <wx/stattext.h>
 #include <string>
-#include <fstream>
-#include <chrono>
-#include <iomanip>
-#include <sstream>
-
-// ---------------------------------------------------------------------------
-// Logger — appends timestamped lines to ~/Library/Logs/MDViewer/mdviewer.log
-// ---------------------------------------------------------------------------
-class Logger {
-public:
-    static Logger& get() {
-        static Logger instance;
-        return instance;
-    }
-
-    void log(const std::string& msg) {
-        if (!m_file.is_open()) return;
-        auto now = std::chrono::system_clock::now();
-        auto t   = std::chrono::system_clock::to_time_t(now);
-        std::ostringstream line;
-        line << std::put_time(std::localtime(&t), "%Y-%m-%d %H:%M:%S")
-             << "  " << msg << "\n";
-        m_file << line.str();
-        m_file.flush();
-    }
-
-private:
-    Logger() {
-        // macOS conventional log location
-        std::string dir = std::string(getenv("HOME") ?: "") + "/Library/Logs/MDViewer";
-        ::system(("mkdir -p \"" + dir + "\"").c_str());
-        m_file.open(dir + "/mdviewer.log", std::ios::app);
-    }
-    std::ofstream m_file;
-};
+#include "logger.h"
 
 enum {
     ID_RELOAD       = wxID_HIGHEST + 1,

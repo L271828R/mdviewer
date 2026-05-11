@@ -8,3 +8,9 @@ std::string BuildHTML(const std::string& body,
                       const std::string& title,
                       bool darkMode,
                       int fontSizePercent = 100);
+
+// Renders the application log file as a themed HTML page.
+// Pure function — no wxWidgets dependency, directly unit-testable.
+std::string BuildLogsHTML(const std::string& rawLog,
+                           const std::string& logPath,
+                           bool darkMode);

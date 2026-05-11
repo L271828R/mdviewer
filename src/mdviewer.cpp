@@ -205,62 +205,8 @@ void MDViewerFrame::LoadAndRender() {
 // Menu handlers
 // ---------------------------------------------------------------------------
 void MDViewerFrame::OnViewLogs(wxCommandEvent&) {
-    std::string logPath = std::string(getenv("HOME") ?: "") + "/Library/Logs/MDViewer/mdviewer.log";
-    std::string raw = ReadFile(logPath);
-
-    const std::string bg      = m_darkMode ? "#0d1117" : "#ffffff";
-    const std::string surface = m_darkMode ? "#161b22" : "#f6f8fa";
-    const std::string border  = m_darkMode ? "#30363d" : "#d0d7de";
-    const std::string text    = m_darkMode ? "#e6edf3" : "#24292f";
-    const std::string muted   = m_darkMode ? "#8b949e" : "#57606a";
-    const std::string green   = m_darkMode ? "#3fb950" : "#1a7f37";
-    const std::string red     = m_darkMode ? "#f85149" : "#cf222e";
-
-    std::string rows;
-    std::istringstream ss(raw);
-    std::string line;
-    while (std::getline(ss, line)) {
-        if (line.empty()) continue;
-        std::string ts, msg;
-        if (line.size() > 21 && line[10] == ' ' && line[19] == ' ') {
-            ts  = line.substr(0, 19);
-            msg = line.substr(21);
-        } else {
-            msg = line;
-        }
-        std::string msgColor = text;
-        if (msg.find("FAILED") != std::string::npos || msg.find("error") != std::string::npos)
-            msgColor = red;
-        else if (msg.find("=== startup") != std::string::npos)
-            msgColor = green;
-
-        rows += "<tr>"
-                "<td class='ts'>" + EscapeHTML(ts) + "</td>"
-                "<td style='color:" + msgColor + "'>" + EscapeHTML(msg) + "</td>"
-                "</tr>\n";
-    }
-
-    std::string html = R"HTML(<!DOCTYPE html><html><head>
-<meta charset="UTF-8">
-<title>MDViewer — Logs</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'SFMono-Regular',Consolas,monospace;font-size:13px;
-     background:)HTML" + bg + R"HTML(;color:)HTML" + text + R"HTML(;padding:24px}
-h2{font-size:15px;font-weight:600;margin-bottom:16px;color:)HTML" + text + R"HTML(}
-table{width:100%;border-collapse:collapse}
-tr{border-bottom:1px solid )HTML" + border + R"HTML(}
-tr:last-child{border-bottom:none}
-td{padding:5px 10px;vertical-align:top;white-space:pre-wrap;word-break:break-all}
-.ts{color:)HTML" + muted + R"HTML(;white-space:nowrap;padding-right:20px;user-select:none}
-tr:hover{background:)HTML" + surface + R"HTML(}
-</style></head><body>
-<h2>MDViewer — Application Log</h2>
-<p style="font-size:12px;color:)HTML" + muted + R"HTML(;margin:8px 0 16px">)HTML"
-+ EscapeHTML(logPath) + R"HTML(</p>
-<table>)HTML" + rows + R"HTML(</table>
-</body></html>)HTML";
-
+    const std::string logPath = std::string(getenv("HOME") ?: "") + "/Library/Logs/MDViewer/mdviewer.log";
+    std::string html = BuildLogsHTML(ReadFile(logPath), logPath, m_darkMode);
     m_webView->SetPage(wxString::FromUTF8(html), "");
     SetStatusText("Viewing logs — use View > View Document to return");
 }

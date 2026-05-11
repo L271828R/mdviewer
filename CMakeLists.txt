@@ -87,6 +87,7 @@ set(SOURCES
     src/mdviewer.cpp
     src/markdown.cpp
     src/html_template.cpp
+    src/logger.cpp
     src/inspector.mm
 )
 add_executable(mdviewer ${SOURCES})
@@ -97,7 +98,10 @@ target_link_libraries(mdviewer PRIVATE ${wxWidgets_LIBRARIES})
 
 # ── Tests (no wxWidgets dependency) ──────────────────────────────────────────
 add_executable(test_mdviewer
-    tests/test_renderer.cpp
+    tests/main.cpp
+    tests/test_markdown.cpp
+    tests/test_html_template.cpp
+    tests/test_mdviewer.cpp
     src/markdown.cpp
     src/html_template.cpp
 )

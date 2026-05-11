@@ -1,5 +1,6 @@
 #include "html_template.h"
 #include "markdown.h"
+#include <sstream>
 #include "mermaid_js.h"
 #include "hljs_js.h"
 #include "hljs_css_light.h"
@@ -389,4 +390,61 @@ zmStage.addEventListener('touchend', () => { zmDrag = false; lastDist = 0; });
 </body>
 </html>
 )HTML";
+}
+
+std::string BuildLogsHTML(const std::string& rawLog,
+                           const std::string& logPath,
+                           bool darkMode) {
+    const std::string bg      = darkMode ? "#0d1117" : "#ffffff";
+    const std::string surface = darkMode ? "#161b22" : "#f6f8fa";
+    const std::string border  = darkMode ? "#30363d" : "#d0d7de";
+    const std::string text    = darkMode ? "#e6edf3" : "#24292f";
+    const std::string muted   = darkMode ? "#8b949e" : "#57606a";
+    const std::string green   = darkMode ? "#3fb950" : "#1a7f37";
+    const std::string red     = darkMode ? "#f85149" : "#cf222e";
+
+    std::string rows;
+    std::istringstream ss(rawLog);
+    std::string line;
+    while (std::getline(ss, line)) {
+        if (line.empty()) continue;
+        std::string ts, msg;
+        if (line.size() > 21 && line[10] == ' ' && line[19] == ' ') {
+            ts  = line.substr(0, 19);
+            msg = line.substr(21);
+        } else {
+            msg = line;
+        }
+        std::string msgColor = text;
+        if (msg.find("FAILED") != std::string::npos || msg.find("error") != std::string::npos)
+            msgColor = red;
+        else if (msg.find("=== startup") != std::string::npos)
+            msgColor = green;
+
+        rows += "<tr>"
+                "<td class='ts'>" + EscapeHTML(ts) + "</td>"
+                "<td style='color:" + msgColor + "'>" + EscapeHTML(msg) + "</td>"
+                "</tr>\n";
+    }
+
+    return R"HTML(<!DOCTYPE html><html><head>
+<meta charset="UTF-8">
+<title>MDViewer — Logs</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'SFMono-Regular',Consolas,monospace;font-size:13px;
+     background:)HTML" + bg + R"HTML(;color:)HTML" + text + R"HTML(;padding:24px}
+h2{font-size:15px;font-weight:600;margin-bottom:16px;color:)HTML" + text + R"HTML(}
+table{width:100%;border-collapse:collapse}
+tr{border-bottom:1px solid )HTML" + border + R"HTML(}
+tr:last-child{border-bottom:none}
+td{padding:5px 10px;vertical-align:top;white-space:pre-wrap;word-break:break-all}
+.ts{color:)HTML" + muted + R"HTML(;white-space:nowrap;padding-right:20px;user-select:none}
+tr:hover{background:)HTML" + surface + R"HTML(}
+</style></head><body>
+<h2>MDViewer — Application Log</h2>
+<p style="font-size:12px;color:)HTML" + muted + R"HTML(;margin:8px 0 16px">)HTML"
++ EscapeHTML(logPath) + R"HTML(</p>
+<table>)HTML" + rows + R"HTML(</table>
+</body></html>)HTML";
 }
