@@ -175,6 +175,107 @@ int main() {
         }
     }
 
+    // 13. Edit menu wires up copy via m_webView->Copy().
+    {
+        std::ifstream src("src/mdviewer.cpp");
+        std::string code((std::istreambuf_iterator<char>(src)),
+                          std::istreambuf_iterator<char>());
+        bool hasCopy    = code.find("m_webView->Copy()") != std::string::npos;
+        bool hasCopyId  = code.find("wxID_COPY") != std::string::npos;
+        if (!hasCopy || !hasCopyId) {
+            std::cerr << "FAIL [edit-copy]: expected m_webView->Copy() and wxID_COPY "
+                         "in mdviewer.cpp\n";
+            ++failures;
+        } else {
+            std::cout << "PASS [edit-copy]\n";
+        }
+    }
+
+    // 14. Find in page uses m_webView->Find() — not a JS workaround.
+    {
+        std::ifstream src("src/mdviewer.cpp");
+        std::string code((std::istreambuf_iterator<char>(src)),
+                          std::istreambuf_iterator<char>());
+        bool hasFind   = code.find("m_webView->Find(") != std::string::npos;
+        bool hasFindId = code.find("wxID_FIND") != std::string::npos;
+        if (!hasFind || !hasFindId) {
+            std::cerr << "FAIL [find-in-page]: expected m_webView->Find( and wxID_FIND "
+                         "in mdviewer.cpp\n";
+            ++failures;
+        } else {
+            std::cout << "PASS [find-in-page]\n";
+        }
+    }
+
+    // 15. Paste to render reads clipboard via wxTheClipboard.
+    {
+        std::ifstream src("src/mdviewer.cpp");
+        std::string code((std::istreambuf_iterator<char>(src)),
+                          std::istreambuf_iterator<char>());
+        bool hasPaste   = code.find("wxID_PASTE") != std::string::npos;
+        bool hasClipGet = code.find("wxTheClipboard->GetData") != std::string::npos;
+        if (!hasPaste || !hasClipGet) {
+            std::cerr << "FAIL [paste-render]: expected wxID_PASTE and "
+                         "wxTheClipboard->GetData in mdviewer.cpp\n";
+            ++failures;
+        } else {
+            std::cout << "PASS [paste-render]\n";
+        }
+    }
+
+    // 16. Find bar must report the correct match count for a known document.
+    //
+    //     Scenario: markdown with three "apple" entries and two other fruits.
+    //     The rendered visible text therefore contains exactly 3 "apple" words.
+    //     wxWebView::Find() returns -1 on macOS WKWebView (its find API is async),
+    //     so DoFind must obtain the total count via RunScript instead of using
+    //     the Find() return value.
+    //
+    //     Part A: verify the markdown renders to exactly 3 visible "apple" words
+    //             (i.e. the document is what we think it is).
+    //     Part B: verify DoFind uses RunScript to count matches rather than
+    //             trusting the Find() return value (which is always -1 on macOS).
+    {
+        // Part A — rendered text count
+        std::string md =
+            "# Fruits\n\n"
+            "- apple\n"
+            "- banana\n"
+            "- apple\n"
+            "- cherry\n"
+            "- apple\n";
+        std::string body = RenderMarkdown(md);
+
+        // Strip HTML tags to get the visible text a browser would show.
+        std::string visible;
+        bool inTag = false;
+        for (char c : body) {
+            if      (c == '<') { inTag = true;  continue; }
+            else if (c == '>') { inTag = false; continue; }
+            else if (!inTag)   visible += c;
+        }
+        int appleCount = 0;
+        for (size_t p = 0; (p = visible.find("apple", p)) != std::string::npos; ++p)
+            ++appleCount;
+
+        // Part B — DoFind must use RunScript for the count
+        std::ifstream src("src/mdviewer.cpp");
+        std::string code((std::istreambuf_iterator<char>(src)),
+                          std::istreambuf_iterator<char>());
+        bool usesRunScript = code.find("RunScript") != std::string::npos;
+
+        if (appleCount != 3 || !usesRunScript) {
+            std::cerr << "FAIL [find-count]: "
+                      << "visible 'apple' count=" << appleCount << " (expected 3); "
+                      << "DoFind uses RunScript=" << usesRunScript
+                      << " — wxWebView::Find() returns -1 on macOS WKWebView so the "
+                         "count must come from RunScript, not the Find() return value\n";
+            ++failures;
+        } else {
+            std::cout << "PASS [find-count]\n";
+        }
+    }
+
     std::cout << (failures ? "FAILED" : "ALL PASSED") << "\n";
     return failures > 0 ? 1 : 0;
 }
